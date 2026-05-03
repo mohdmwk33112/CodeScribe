@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeScribe Results</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚡ CodeScribe Results</h1>
+    </div>
+    
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p id="progress-text">Generating documentation and tests...</p>
+    </div>
+    
+    <div id="content" style="display: none;">
+      <div class="tabs">
+        <button class="tab active" data-tab="docstring">Docstring</button>
+        <button class="tab" data-tab="readme">README Section</button>
+        <button class="tab" data-tab="tests">Unit Tests</button>
+        <button class="tab" data-tab="coverage">Coverage</button>
+      </div>
+      
+      <div class="controls">
+        <div class="audience-selector">
+          <label for="audience">Audience:</label>
+          <select id="audience" class="dropdown">
+            <option value="junior">Junior Dev</option>
+            <option value="senior" selected>Senior Dev</option>
+            <option value="api-consumer">API Consumer</option>
+          </select>
+        </div>
+        <button class="button secondary" id="regenerate">Regenerate</button>
+      </div>
+      
+      <div id="docstring-tab" class="tab-content active">
+        <div class="code-block-wrapper">
+          <pre class="code-block"><code class="language-python" id="docstring-content"></code></pre>
+          <button class="button copy-button" data-target="docstring-content">Copy</button>
+        </div>
+        <div class="actions">
+          <button class="button primary" id="insert-docstring">Insert Docstring</button>
+        </div>
+      </div>
+      
+      <div id="readme-tab" class="tab-content">
+        <div class="code-block-wrapper">
+          <button class="button secondary" id="toggle-readme-view" style="margin-bottom: 10px;">View Raw</button>
+          <div id="readme-rendered" style="display: block;"></div>
+          <pre class="code-block" id="readme-raw" style="display: none;"><code class="language-markdown" id="readme-content"></code></pre>
+          <button class="button copy-button" data-target="readme-content">Copy</button>
+        </div>
+        <div class="actions">
+          <button class="button primary" id="save-readme">Save as README.md</button>
+        </div>
+      </div>
+      
+      <div id="tests-tab" class="tab-content">
+        <div class="code-block-wrapper">
+          <pre class="code-block"><code class="language-python" id="tests-content"></code></pre>
+          <button class="button copy-button" data-target="tests-content">Copy</button>
+        </div>
+        <div class="actions">
+          <button class="button primary" id="create-test-file">Create Test File</button>
+        </div>
+      </div>
+      
+      <div id="coverage-tab" class="tab-content">
+        <div class="coverage-display">
+          <div class="coverage-percentage" id="coverage-percentage">0%</div>
+          
+          <div class="coverage-bar-container">
+            <div class="coverage-bar-fill" id="coverage-bar-fill"></div>
+          </div>
+          
+          <div class="coverage-counters">
+            <span class="counter-item documented">
+              ✅ Documented: <strong id="documented-count">0</strong>
+            </span>
+            <span class="counter-item missing">
+              ❌ Missing: <strong id="missing-count">0</strong>
+            </span>
+          </div>
+          
+          <div class="undocumented-list-container">
+            <h3>Undocumented Functions</h3>
+            <div class="undocumented-list" id="undocumented-list">
+              <div class="function-item">No analysis yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const vscode = acquireVsCodeApi();
+    
+    // README view toggle state
+    let isReadmeRendered = true;
+    let readmeContent = '';
+    
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.getAttribute('data-tab');
+        
+        // Update active tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Update active content
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        document.getElementById(targetTab + '-tab').classList.add('active');
+        
+        // Update button visibility
+        updateButtonVisibility(targetTab);
+      });
+    });
+    
+    // README view toggle handler
+    document.getElementById('toggle-readme-view').addEventListener('click', () => {
+      const toggleButton = document.getElementById('toggle-readme-view');
+      const renderedView = document.getElementById('readme-rendered');
+      const rawView = document.getElementById('readme-raw');
+      
+      isReadmeRendered = !isReadmeRendered;
+      
+      if (isReadmeRendered) {
+        renderedView.style.display = 'block';
+        rawView.style.display = 'none';
+        toggleButton.textContent = 'View Raw';
+      } else {
+        renderedView.style.display = 'none';
+        rawView.style.display = 'block';
+        toggleButton.textContent = 'View Rendered';
+        // Apply syntax highlighting to raw view
+        Prism.highlightElement(document.getElementById('readme-content'));
+      }
+    });
+    
+    // Update button visibility based on active tab
+    function updateButtonVisibility(activeTab) {
+      const insertButton = document.getElementById('insert-docstring');
+      const createTestButton = document.getElementById('create-test-file');
+      const saveReadmeButton = document.getElementById('save-readme');
+      
+      // Show Insert Docstring only on Docstring tab
+      if (activeTab === 'docstring') {
+        insertButton.style.display = 'inline-block';
+      } else {
+        insertButton.style.display = 'none';
+      }
+      
+      // Show Create Test File only on Tests tab
+      if (activeTab === 'tests') {
+        createTestButton.style.display = 'inline-block';
+      } else {
+        createTestButton.style.display = 'none';
+      }
+      
+      // Show Save README only on README tab
+      if (activeTab === 'readme') {
+        saveReadmeButton.style.display = 'inline-block';
+      } else {
+        saveReadmeButton.style.display = 'none';
+      }
+    }
+    
+    // Copy button handlers
+    document.querySelectorAll('.copy-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const targetId = button.getAttribute('data-target');
+        const targetElement = document.getElementById(targetId);
+        const text = targetElement.textContent || targetElement.innerText;
+        
+        vscode.postMessage({
+          command: 'copy',
+          text: text
+        });
+        
+        // Visual feedback
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      });
+    });
+    
+    // Regenerate button handler
+    document.getElementById('regenerate').addEventListener('click', () => {
+      const audience = document.getElementById('audience').value;
+      
+      // Show loading
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('content').style.display = 'none';
+      
+      vscode.postMessage({
+        command: 'regenerate',
+        audience: audience
+      });
+    });
+    
+    // Insert Docstring button
+    document.getElementById('insert-docstring').addEventListener('click', () => {
+      const docstring = document.getElementById('docstring-content').textContent;
+      vscode.postMessage({
+        command: 'insertDocstring',
+        docstring: docstring
+      });
+    });
+    
+    // Create Test File button
+    document.getElementById('create-test-file').addEventListener('click', () => {
+      const tests = document.getElementById('tests-content').textContent;
+      vscode.postMessage({
+        command: 'createTestFile',
+        tests: tests
+      });
+    });
+    
+    // Save README button
+    document.getElementById('save-readme').addEventListener('click', () => {
+      vscode.postMessage({
+        command: 'saveReadme',
+        content: readmeContent
+      });
+    });
+    
+    // Receive data from extension
+    window.addEventListener('message', event => {
+      // Handle progress updates
+      if (event.data.type === 'progress') {
+        document.getElementById('progress-text').textContent = event.data.message;
+        return;
+      }
+      
+      // Handle coverage data
+      if (event.data.type === 'coverage') {
+        const coverageData = event.data.data;
+        
+        // Update percentage
+        document.getElementById('coverage-percentage').textContent =
+          coverageData.percentage.toFixed(1) + '%';
+        
+        // Update progress bar
+        document.getElementById('coverage-bar-fill').style.width =
+          coverageData.percentage + '%';
+        
+        // Update counters
+        document.getElementById('documented-count').textContent =
+          coverageData.documented;
+        document.getElementById('missing-count').textContent =
+          coverageData.undocumented.length;
+        
+        // Populate undocumented list
+        const listContainer = document.getElementById('undocumented-list');
+        listContainer.innerHTML = '';
+        
+        if (coverageData.undocumented.length === 0) {
+          listContainer.innerHTML = '<div class="function-item">🎉 All functions are documented!</div>';
+        } else {
+          coverageData.undocumented.forEach(funcName => {
+            const item = document.createElement('div');
+            item.className = 'function-item';
+            item.textContent = funcName;
+            item.addEventListener('click', () => {
+              vscode.postMessage({
+                command: 'jumpToFunction',
+                functionName: funcName
+              });
+            });
+            listContainer.appendChild(item);
+          });
+        }
+        
+        // Switch to coverage tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('[data-tab="coverage"]').classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('coverage-tab').classList.add('active');
+        
+        // Show content, hide loading
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        
+        return;
+      }
+      
+      const { docstring, readme, tests, modelId } = event.data;
+      
+      // Hide loading, show content
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      
+      // Populate content
+      document.getElementById('docstring-content').textContent = docstring || 'No docstring generated';
+      
+      // Populate README with both rendered and raw views
+      readmeContent = readme || 'No README generated';
+      document.getElementById('readme-content').textContent = readmeContent;
+      document.getElementById('readme-rendered').innerHTML = marked.parse(readmeContent);
+      
+      document.getElementById('tests-content').textContent = tests || 'No tests generated';
+      
+      // Update model name if element exists
+      const modelNameElement = document.getElementById('model-name');
+      if (modelNameElement && modelId) {
+        modelNameElement.textContent = modelId;
+      }
+      
+      // Apply Prism syntax highlighting
+      Prism.highlightAll();
+      
+      // Initialize button visibility
+      updateButtonVisibility('docstring');
+    });
+    
+  </script>
+  
+  <style>
+    /* Progress text styling */
+    #progress-text {
+      color: var(--vscode-descriptionForeground);
+      font-size: var(--vscode-editor-font-size);
+      text-align: center;
+      margin-top: 10px;
+    }
+    
+    /* Rendered markdown styling using VS Code CSS variables */
+    #readme-rendered {
+      padding: 16px;
+      line-height: 1.6;
+      color: var(--vscode-editor-foreground);
+      background-color: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    
+    #readme-rendered h1,
+    #readme-rendered h2,
+    #readme-rendered h3,
+    #readme-rendered h4,
+    #readme-rendered h5,
+    #readme-rendered h6 {
+      color: var(--vscode-editor-foreground);
+      margin-top: 24px;
+      margin-bottom: 16px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    
+    #readme-rendered h1 {
+      font-size: 2em;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      padding-bottom: 0.3em;
+    }
+    
+    #readme-rendered h2 {
+      font-size: 1.5em;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      padding-bottom: 0.3em;
+    }
+    
+    #readme-rendered h3 {
+      font-size: 1.25em;
+    }
+    
+    #readme-rendered p {
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+    
+    #readme-rendered code {
+      background-color: var(--vscode-textCodeBlock-background);
+      color: var(--vscode-textPreformat-foreground);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 0.9em;
+    }
+    
+    #readme-rendered pre {
+      background-color: var(--vscode-textCodeBlock-background);
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+    
+    #readme-rendered pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+    
+    #readme-rendered ul,
+    #readme-rendered ol {
+      margin-top: 0;
+      margin-bottom: 16px;
+      padding-left: 2em;
+    }
+    
+    #readme-rendered li {
+      margin-bottom: 4px;
+    }
+    
+    #readme-rendered a {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: none;
+    }
+    
+    #readme-rendered a:hover {
+      text-decoration: underline;
+    }
+    
+    #readme-rendered blockquote {
+      margin: 0 0 16px 0;
+      padding: 0 1em;
+      color: var(--vscode-descriptionForeground);
+      border-left: 4px solid var(--vscode-panel-border);
+    }
+    
+    #readme-rendered table {
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      width: 100%;
+    }
+    
+    #readme-rendered table th,
+    #readme-rendered table td {
+      padding: 6px 13px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+    
+    #readme-rendered table th {
+      font-weight: 600;
+      background-color: var(--vscode-editor-inactiveSelectionBackground);
+    }
+    
+    #readme-rendered hr {
+      border: 0;
+      border-top: 1px solid var(--vscode-panel-border);
+      margin: 24px 0;
+    }
+    
+    #readme-rendered strong {
+      font-weight: 600;
+    }
+    
+    #readme-rendered em {
+      font-style: italic;
+    }
+    
+    /* Coverage tab styles */
+    .coverage-display {
+      padding: 20px;
+    }
+    
+    .coverage-percentage {
+      font-size: 48px;
+      font-weight: bold;
+      text-align: center;
+      color: var(--vscode-foreground);
+      margin-bottom: 20px;
+    }
+    
+    .coverage-bar-container {
+      width: 100%;
+      height: 30px;
+      background: var(--vscode-tab-inactiveBackground);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+    
+    .coverage-bar-fill {
+      height: 100%;
+      background: var(--vscode-button-background);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    
+    .coverage-counters {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 30px;
+      padding: 15px;
+      background: var(--vscode-editor-background);
+      border-radius: 4px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+    
+    .counter-item {
+      font-size: 16px;
+      color: var(--vscode-foreground);
+    }
+    
+    .counter-item strong {
+      font-size: 20px;
+      color: var(--vscode-textLink-foreground);
+    }
+    
+    .undocumented-list-container {
+      margin-top: 20px;
+    }
+    
+    .undocumented-list-container h3 {
+      color: var(--vscode-foreground);
+      margin-bottom: 15px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .undocumented-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      background: var(--vscode-editor-background);
+    }
+    
+    .function-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      cursor: pointer;
+      transition: background 0.2s;
+      color: var(--vscode-foreground);
+      font-family: var(--vscode-editor-font-family);
+    }
+    
+    .function-item:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+    
+    .function-item:last-child {
+      border-bottom: none;
+    }
+    
+    .function-item:active {
+      background: var(--vscode-list-activeSelectionBackground);
+      color: var(--vscode-list-activeSelectionForeground);
+    }
+  </style>
+</body>
+</html>

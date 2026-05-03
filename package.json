@@ -1,0 +1,68 @@
+{
+  "name": "codescribe",
+  "displayName": "CodeScribe",
+  "description": "Generate documentation and unit tests using IBM Watsonx AI",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "CodeScribe.generate",
+        "title": "⚡ CodeScribe: Generate Docs & Tests"
+      },
+      {
+        "command": "codescribe.coverage",
+        "title": "📊 CodeScribe: Show Coverage"
+      },
+      {
+        "command": "codescribe.batchGenerate",
+        "title": "📚 CodeScribe: Document Entire File"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "CodeScribe.generate",
+          "when": "editorTextFocus",
+          "group": "navigation"
+        },
+        {
+          "command": "codescribe.coverage",
+          "when": "editorTextFocus",
+          "group": "navigation"
+        },
+        {
+          "command": "codescribe.batchGenerate",
+          "when": "editorTextFocus",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "eslint": "^8.x",
+    "typescript": "^5.x"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}
