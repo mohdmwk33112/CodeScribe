@@ -5,7 +5,7 @@
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.80%2B-blue.svg)](https://code.visualstudio.com/)
 [![IBM Watsonx](https://img.shields.io/badge/Powered%20by-IBM%20Watsonx-052FAD.svg)](https://www.ibm.com/watsonx)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.md)
 
 > Transform undocumented code into well-documented, tested projects in seconds using IBM Watsonx AI.
 
@@ -332,6 +332,12 @@ Contributions are welcome! Please follow these guidelines:
 - **Large Functions**: Functions >500 lines may timeout or produce incomplete results
 - **Complex Syntax**: Nested functions or unusual indentation may confuse detection algorithm
 - **API Rate Limits**: IBM Watsonx has rate limits; batch processing large files may hit limits
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
