@@ -335,12 +335,6 @@ Contributions are welcome! Please follow these guidelines:
 
 ---
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🙏 Acknowledgments
 
 - **IBM Watsonx AI**: For providing the powerful Llama 3.3 70B model
