@@ -1,4 +1,4 @@
-# 🚀 CodeScribe
+# 🚀 CodeScribe (IBM Hackathon Project)
 
 **AI-Powered Documentation & Test Generation for VS Code**
 
